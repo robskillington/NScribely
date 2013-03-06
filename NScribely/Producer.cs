@@ -62,13 +62,29 @@ namespace NScribely
 			transport.Open();
 
 			var client = new ScribeClient.Client(protocol);
+			var retry = new List<Item>();
 
 			while (Queue.Count > 0)
 			{
+				Item item;
+
 				try
 				{
-					var item = Queue.Dequeue() as Item;
+					item = Queue.Dequeue() as Item;
+				}
+				catch (InvalidOperationException)
+				{
+					// No item available, while loop will ensure we fall out after this
+					continue;
+				}
 
+				if (item == null)
+				{
+					continue;
+				}
+
+				try
+				{
 					client.Log(new List<LogEntry>
 						{
 							new LogEntry
@@ -80,13 +96,20 @@ namespace NScribely
 
 					Console.WriteLine("Sent log");
 				}
-				catch (InvalidOperationException)
+				catch (Exception)
 				{
-					// No item available, while loop will ensure we fall out after this
+					// Retry next iteration
+					retry.Add(item);
 				}
 			}
 
 			transport.Close();
+
+			// Add to the queue items to retry
+			foreach (var item in retry)
+			{
+				Queue.Enqueue(item);
+			}
 
 			QueueFlushed(this, EventArgs.Empty);
 		}
