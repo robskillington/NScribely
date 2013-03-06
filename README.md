@@ -1,6 +1,6 @@
 # NScribely
 
-A scribe client that is a producer for use with scribely
+A scribe client and a scribely producer for use with scribely
 
 ## Roadmap
 
