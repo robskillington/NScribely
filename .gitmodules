@@ -1,0 +1,3 @@
+[submodule "Library/Thrift"]
+	path = Library/Thrift
+	url = https://git-wip-us.apache.org/repos/asf/thrift.git

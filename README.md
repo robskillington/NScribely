@@ -1,4 +1,4 @@
 NScribely
 =========
 
-A scribe producer compatible with scribely
+A scribe client that is a producer for use with scribely
