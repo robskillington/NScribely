@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Timers;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using NScribely.Scribe;
 using Thrift.Protocol;
 using Thrift.Transport;
+using Timer = System.Timers.Timer;
 
 namespace NScribely
 {
@@ -12,7 +14,7 @@ namespace NScribely
 
 	public class Producer
 	{
-		public const int DefaultFlushInterval = 1000;
+		public const int DefaultFlushInterval = 200;
 
 		public Producer(string host, int port, int flushInterval = DefaultFlushInterval)
 		{
@@ -40,6 +42,7 @@ namespace NScribely
 		private Queue Queue { get; set; }
 
 		private Timer Timer { get; set; }
+
 		public event ProducerQueueFlushedEventHandler QueueFlushed;
 
 		public Producer Send(string category, string message)
@@ -53,6 +56,7 @@ namespace NScribely
 			return this;
 		}
 
+		[MethodImplAttribute(MethodImplOptions.Synchronized)]
 		private void FlushQueue()
 		{
 			var socket = new TSocket(Host, Port);
