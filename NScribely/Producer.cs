@@ -43,7 +43,7 @@ namespace NScribely
 
 		private Timer Timer { get; set; }
 
-		public event ProducerQueueFlushedEventHandler QueueFlushed;
+		public event ProducerQueueFlushedEventHandler QueueFlushed = (sender, args) => { };
 
 		public Producer Send(string category, string message)
 		{
@@ -97,8 +97,6 @@ namespace NScribely
 									Message = item.Message
 								}
 						});
-
-					Console.WriteLine("Sent log");
 				}
 				catch (Exception)
 				{
