@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using NScribely.Scribe;
 using Thrift.Protocol;
 using Thrift.Transport;
@@ -23,16 +21,12 @@ namespace NScribely
 				throw new ArgumentException("not a positive integer", "flushInterval");
 			}
 
+			FlushInterval = flushInterval;
 			Host = host;
 			Port = port;
 			Queue = Queue.Synchronized(new Queue());
-			Timer = new Timer
-				{
-					Interval = flushInterval,
-					Enabled = true
-				};
 
-			Timer.Elapsed += (sender, args) => FlushQueue();
+			ScheduleFlush();
 		}
 
 		public string Host { get; private set; }
@@ -42,6 +36,8 @@ namespace NScribely
 		private Queue Queue { get; set; }
 
 		private Timer Timer { get; set; }
+
+		private int FlushInterval { get; set; }
 
 		public event ProducerQueueFlushedEventHandler QueueFlushed = (sender, args) => { };
 
@@ -56,9 +52,26 @@ namespace NScribely
 			return this;
 		}
 
-		[MethodImplAttribute(MethodImplOptions.Synchronized)]
+		private void ScheduleFlush()
+		{
+			Timer = new Timer
+			{
+				Interval = FlushInterval,
+				Enabled = true,
+				AutoReset = false
+			};
+
+			Timer.Elapsed += (sender, args) => FlushQueue();
+		}
+
 		private void FlushQueue()
 		{
+			if (Queue.Count < 1)
+			{
+				ScheduleFlush();
+				return;
+			}
+
 			var socket = new TSocket(Host, Port);
 			var transport = new TFramedTransport(socket);
 			var protocol = new TBinaryProtocol(transport, false, false);
@@ -114,6 +127,8 @@ namespace NScribely
 			}
 
 			QueueFlushed(this, EventArgs.Empty);
+
+			ScheduleFlush();
 		}
 	}
 }
