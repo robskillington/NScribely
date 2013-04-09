@@ -12,16 +12,22 @@ namespace NScribely
 
 	public class Producer
 	{
-		public const int DefaultFlushInterval = 200;
+		// Try to flush the queue every 200ms
+		public const int DefaultFlushIntervalMs = 200;
 
-		public Producer(string host, int port, int flushInterval = DefaultFlushInterval)
+		// 2^15: tested to roughly use ~45mb for messages roughly 600bytes long, 
+		// a relatively good buffer if the receiver dies for a few hours
+		public const int DefaultMaxQueueBuffer = 32768; 
+
+		public Producer(string host, int port, int flushIntervalMs = DefaultFlushIntervalMs, int maxQueueBuffer = DefaultMaxQueueBuffer)
 		{
-			if (flushInterval < 1)
+			if (flushIntervalMs < 1)
 			{
-				throw new ArgumentException("not a positive integer", "flushInterval");
+				throw new ArgumentException("not a positive integer", "flushIntervalMs");
 			}
 
-			FlushInterval = flushInterval;
+			FlushIntervalMs = flushIntervalMs;
+			MaxQueueBuffer = maxQueueBuffer;
 			Host = host;
 			Port = port;
 			Queue = Queue.Synchronized(new Queue());
@@ -37,29 +43,36 @@ namespace NScribely
 
 		private Timer Timer { get; set; }
 
-		private int FlushInterval { get; set; }
+		private int FlushIntervalMs { get; set; }
+
+		private int MaxQueueBuffer { get; set; }
 
 		public event ProducerQueueFlushedEventHandler QueueFlushed = (sender, args) => { };
 
-		public Producer Send(string category, string message)
+		public bool TrySend(string category, string message)
 		{
+			if (Queue.Count >= MaxQueueBuffer)
+			{
+				return false;
+			}
+
 			Queue.Enqueue(new Item
 				{
 					Category = category,
 					Message = message
 				});
 
-			return this;
+			return true;
 		}
 
 		private void ScheduleFlush()
 		{
 			Timer = new Timer
-			{
-				Interval = FlushInterval,
-				Enabled = true,
-				AutoReset = false
-			};
+				{
+					Interval = FlushIntervalMs,
+					Enabled = true,
+					AutoReset = false
+				};
 
 			Timer.Elapsed += (sender, args) => FlushQueue();
 		}
