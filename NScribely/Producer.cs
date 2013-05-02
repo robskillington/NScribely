@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using NScribely.Scribe;
 using Thrift.Protocol;
 using Thrift.Transport;
@@ -12,6 +13,9 @@ namespace NScribely
 
 	public class Producer
 	{
+		// Timeout after 10s if the endpoint is not available
+		public const int DefaultEndpointTimeoutMs = 10000;
+
 		// Try to flush the queue every 200ms
 		public const int DefaultFlushIntervalMs = 200;
 
@@ -85,11 +89,29 @@ namespace NScribely
 				return;
 			}
 
-			var socket = new TSocket(Host, Port);
-			var transport = new TFramedTransport(socket);
-			var protocol = new TBinaryProtocol(transport, false, false);
+			TFramedTransport transport;
+			TBinaryProtocol protocol;
 
-			transport.Open();
+			try
+			{
+				var socket = new TSocket(Host, Port)
+					{
+						Timeout = DefaultEndpointTimeoutMs
+					};
+
+				transport = new TFramedTransport(socket);
+				protocol = new TBinaryProtocol(transport, false, false);
+
+				transport.Open();
+			}
+			catch (IOException exception)
+			{
+				// Connection failure, reschedule another flush
+				ScheduleFlush();
+
+				return;
+			}
+			
 
 			var client = new ScribeClient.Client(protocol);
 			var retry = new List<Item>();
@@ -124,6 +146,14 @@ namespace NScribely
 								}
 						});
 				}
+				catch (IOException)
+				{
+					// Retry next iteration
+					retry.Add(item);
+
+					// Break out, likely not connected anymore
+					break;
+				}
 				catch (Exception)
 				{
 					// Retry next iteration
@@ -131,17 +161,26 @@ namespace NScribely
 				}
 			}
 
-			transport.Close();
-
 			// Add to the queue items to retry
 			foreach (var item in retry)
 			{
 				Queue.Enqueue(item);
 			}
 
+			// Raise flushed event
 			QueueFlushed(this, EventArgs.Empty);
 
+			// Reschedule another flush
 			ScheduleFlush();
+
+			try
+			{
+				transport.Close();
+			}
+			catch (IOException exception)
+			{
+				// Likely the connection was never open
+			}
 		}
 	}
 }
