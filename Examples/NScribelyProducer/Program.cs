@@ -12,7 +12,7 @@ namespace NScribelyProducer
 
 			var producer = new Producer("127.0.0.1", 1463);
 			producer.QueueFlushed += (sender, eventArgs) => wait.Set();
-			producer.Send("default", "hello world from NScribely");
+			producer.TrySend("default", "hello world from NScribely");
 
 			wait.WaitOne();
 		}
